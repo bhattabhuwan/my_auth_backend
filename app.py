@@ -9,15 +9,16 @@ from flask_cors import CORS
 from datetime import timedelta
 import logging
 
-# NEW: Swagger
+# Swagger
 from flasgger import Swagger
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)  # INFO level to avoid debug spam
+logging.basicConfig(level=logging.INFO)  # INFO level
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app)
+swagger = Swagger(app)
+CORS(app)  # Enable CORS
 
 # Configs
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///user.db'
@@ -25,9 +26,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = 'change_this_to_a_strong_secret_key_in_production'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=60)
 app.config['JWT_ERROR_MESSAGE_KEY'] = 'msg'
-
-# Swagger config
-swagger = Swagger(app)
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
@@ -55,7 +53,19 @@ def expired_token_callback(jwt_header, jwt_payload):
     logger.warning("Expired token used")
     return jsonify({'msg': 'Token has expired', 'error': 'token_expired'}), 401
 
-# Routes
+# Root route for Render / health check
+@app.route('/')
+def home():
+    """
+    Home route to check if API is running
+    ---
+    responses:
+      200:
+        description: API is running
+    """
+    return "API is running!", 200
+
+# Register route
 @app.route('/register', methods=['POST'])
 def register():
     """
@@ -126,7 +136,7 @@ def register():
         logger.exception("Error during registration")
         return jsonify({'msg': 'Server error during registration'}), 500
 
-
+# Login route
 @app.route('/login', methods=['POST'])
 def login():
     """
@@ -186,8 +196,7 @@ def login():
         logger.exception("Error during login")
         return jsonify({'msg': 'Server error during login'}), 500
 
-# (👉 the rest of your endpoints remain the same)
-
+# Forgot-password route
 @app.route('/forgot-password', methods=['POST'])
 def forgot_password():
     try:
@@ -207,13 +216,12 @@ def forgot_password():
         return jsonify({'reset_token': reset_token}), 200
 
     except Exception as e:
-        print(f"Error in forgot_password: {e}")
+        logger.exception(f"Error in forgot_password: {e}")
         return jsonify({'msg': 'something went wrong'}), 500
 
 # ... keep all your other routes (reset-password, refresh, protected, users, delete, etc.) unchanged ...
 
-
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+        db.create_all()   # ensures tables are created
+    app.run(host='0.0.0.0', port=5000)
